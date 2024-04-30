@@ -1,0 +1,139 @@
+---
+title: "BAX 493 A HW 2"
+author: "Richard Liu"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+```{r}
+library("forecast")
+library("tseries") 		# reqired for adf.test of stationarity
+#install.packages("dplyr")
+##install.packages("readr")
+library(dplyr)
+#install.packages("tidyr")
+library(tidyr)
+library(psych)
+library(readr)
+##install.packages("ggplot2")  
+##install.packages("readxl")
+##install.packages("corrplot")
+library(readxl)
+library(ggplot2)
+library(corrplot)
+#install.packages("stringr")
+library(stringr)
+#install.packages("EnvStats")
+library(EnvStats)
+#install.packages("PASWR2")
+library(PASWR2)
+#install.packages("pwr")
+library(pwr)
+#install.packages("car")
+library(car)
+library(forecast)
+#install.packages("forecast")
+#install.packages("multinom")
+library(nnet)
+#install.packages("MuMIn")
+library(MuMIn)
+```
+
+```{r}
+setwd("/Users/richardaliu/Downloads/Winter/BAX 493 A/HW 2")
+data <- read_xlsx("2020_Covid_Data.xlsx")
+
+Richard <- data$KS[1:346]
+Richard <- head(Richard, -1)
+yy <- ts(Richard, frequency = 366, start = c(2020,22))		# coverts sales data as time series object with start date and frequency (weekly here)
+plot.ts(yy)		
+
+# Use Augmented Dickey-Fuller Test to test stationarity == > large p-value means nonstationary
+adf.test(yy)							# if p-value is large (> 0.10), then nonstationary
+yd <- diff(yy, differences = 3)			
+plot.ts(yd)								# looks stationary visually
+adf.test(yd)							# estimated p = 0.01 => small p-value (< 0.10) => so yd is stationary ==> fix d = 1 in ARIMA models to be fitted
+```
+
+
+```{r}
+#######Fit auto.arima (p,d,q) x (P,D,Q) model
+#Do auto fit first auto.arima
+auto_fit <- auto.arima(yy, seasonal = FALSE)  # 'seasonal = FALSE' since the data is not seasonal
+# Display the summary of the fitted model
+summary(auto_fit)
+
+Pacf(yd, lag.max = 10)	 # Pacf suggests p = 1 
+
+Acf(yd, lag.max = 10)	  # Acf suggests q = 1 
+
+######Fit alternative ARIMA models as you deem fit
+#Manually do arima model
+m1 <- Arima(yy, order = c(5,3,5))
+m2 <- Arima(yy, order = c(5,3,3))			
+m3 <- Arima(yy, order = c(5,2,5))
+m4 <- Arima(yy, order = c(4,3,3))
+m5 <- Arima(yy, order = c(3,3,4))
+m6 <- Arima(yy, order = c(5,2,3))
+
+summary(m1)
+summary(m2)
+summary(m3)
+summary(m4)
+summary(m5)
+summary(m6)
+
+```
+
+```{r}
+library("MuMIn")
+
+# Calculate AICc and BIC for each model
+aiccs <- c(AICc(m1), AICc(m2), AICc(m3), AICc(m4), AICc(m5), AICc(m6))
+```
+
+```{r}
+bics <- c(BIC(m1), BIC(m2), BIC(m3), BIC(m4), BIC(m5), BIC(m6))
+
+model_comparisons <- data.frame(Model = 1:6, AICc = aiccs, BIC = bics)
+model_comparisons$Delta_AICc <- model_comparisons$AICc - min(model_comparisons$AICc)
+model_comparisons$Delta_BIC <- model_comparisons$BIC - min(model_comparisons$BIC)
+model_comparisons$Weights_AICc <- exp(-0.5 * model_comparisons$Delta_AICc) / sum(exp(-0.5 * model_comparisons$Delta_AICc))
+model_comparisons$Weights_BIC <- exp(-0.5 * model_comparisons$Delta_BIC) / sum(exp(-0.5 * model_comparisons$Delta_BIC))
+
+model_comparisons
+
+```
+
+```{r}
+m1.predict <- forecast:::forecast.Arima(m1, h = 41, level = c(68, 90))
+plot(m1.predict)
+summary(m1.predict)
+
+m2.predict <- forecast:::forecast.Arima(m2, h = 41, level = c(68, 90))
+plot(m2.predict)
+summary(m2.predict)	
+
+m3.predict <- forecast:::forecast.Arima(m3, h = 41, level = c(68, 90))
+plot(m3.predict)
+summary(m3.predict)	
+
+m4.predict <- forecast:::forecast.Arima(m4, h = 41, level = c(68, 90))
+plot(m4.predict)
+summary(m4.predict)	
+
+m5.predict <- forecast:::forecast.Arima(m5, h = 41, level = c(68, 90))
+plot(m5.predict)
+summary(m5.predict)	
+
+m6.predict <- forecast:::forecast.Arima(m6, h = 41, level = c(68, 90))
+plot(m6.predict)
+summary(m6.predict)	
+```
+
+```{r}
+Richard_forcast <- data.frame(m1.predict$mean)
+Richard_forcast
+```
+
